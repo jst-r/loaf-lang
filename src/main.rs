@@ -1,18 +1,25 @@
 use std::io::BufRead;
 
+mod compiler;
 mod parser;
+mod runtime;
 
-use parser::{parse, LoafParser, Rule};
-use pest::Parser;
+use compiler::compile;
+use parser::parse;
+use runtime::run;
 
-fn main() {}
+fn main() {
+    _repl();
+}
 
 fn _repl() {
     for line in std::io::stdin().lock().lines() {
         let line = line.unwrap();
         match parse(&line) {
             Ok(expr) => {
-                println!("{:?}", expr);
+                let wat = compile(expr).as_wat();
+                println!("{}", wat);
+                run(&wat).unwrap();
             }
             Err(err) => println!("{:?}", err),
         }
