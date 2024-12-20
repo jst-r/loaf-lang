@@ -1,0 +1,24 @@
+WHITESPACE = _{ " " | "\t" | NEWLINE }
+
+integer = @{
+    ASCII_DIGIT+
+}
+
+primary = _{
+    integer
+  | "(" ~ expr ~ ")"
+}
+
+bin_op = _{ add | subtract | multiply | divide }
+
+add      = { "+" }
+subtract = { "-" }
+multiply = { "*" }
+divide   = { "/" }
+
+prefix = _{ negate }
+negate =  { "-" }
+
+expr = { prefix? ~ primary ~ (bin_op ~ prefix? ~ primary)* }
+
+equation = _{ SOI ~ expr ~ EOI }
