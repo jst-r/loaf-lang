@@ -1,15 +1,24 @@
+use std::fmt::Display;
+
 use crate::parser::{BinOp, Expr, PrefixOp};
 
 #[derive(Debug)]
 pub struct Module {
     functions: Vec<Function>,
 }
+
+pub struct Local {
+    name: String,
+    ty: Type,
+}
+
 #[derive(Debug)]
 pub struct Function {
     name: String,
     exported: bool,
     body: Vec<Instruction>,
 }
+
 #[derive(Debug)]
 pub enum Instruction {
     Constant(i32),
@@ -17,6 +26,10 @@ pub enum Instruction {
     Subtract,
     Multiply,
     Divide,
+}
+
+pub enum Type {
+    I32,
 }
 
 pub fn compile(expr: Expr) -> Module {
@@ -35,8 +48,8 @@ pub fn compile_expr(expr: Expr, res: &mut Vec<Instruction>) {
     match expr {
         Expr::Integer(i) => res.push(Instruction::Constant(i)),
         Expr::BinOp { lhs, op, rhs } => {
-            compile_expr(*rhs, res);
             compile_expr(*lhs, res);
+            compile_expr(*rhs, res);
 
             match op {
                 BinOp::Add => res.push(Instruction::Add),
@@ -45,60 +58,84 @@ pub fn compile_expr(expr: Expr, res: &mut Vec<Instruction>) {
                 BinOp::Divide => res.push(Instruction::Divide),
             }
         }
-        Expr::Prefix { op, rhs } => {
-            compile_expr(*rhs, res);
-
-            match op {
-                PrefixOp::Negate => {
-                    res.push(Instruction::Constant(-1));
-                    res.push(Instruction::Subtract)
-                }
+        Expr::Prefix { op, rhs } => match op {
+            PrefixOp::Negate => {
+                res.push(Instruction::Constant(0));
+                compile_expr(*rhs, res);
+                res.push(Instruction::Subtract);
             }
+        },
+    }
+}
+
+pub struct WatFormatter {
+    indent: usize,
+    res: String,
+}
+
+impl WatFormatter {
+    pub fn new() -> Self {
+        Self {
+            indent: 0,
+            res: String::new(),
         }
+    }
+
+    pub fn format(&mut self, module: &Module) -> String {
+        self.format_module(module);
+        self.res.clone()
+    }
+
+    fn format_module(&mut self, module: &Module) {
+        self.push_line("(module");
+        self.indent += 2;
+
+        for func in &module.functions {
+            self.format_function(func);
+        }
+
+        self.indent -= 2;
+        self.push_line(")");
+    }
+
+    fn format_function(&mut self, func: &Function) {
+        self.push_line(format!("(func ${} (result i32)", func.name));
+        self.indent += 2;
+        for instr in &func.body {
+            self.format_instruction(instr);
+        }
+
+        self.indent -= 2;
+        self.push_line(")");
+
+        if func.exported {
+            self.push_line(format!("(export \"{}\" (func ${}))", func.name, func.name));
+        }
+    }
+
+    fn format_instruction(&mut self, instr: &Instruction) {
+        use Instruction::*;
+
+        let line = match instr {
+            Constant(i) => format!("i32.const {}", i),
+            Add => "i32.add".to_string(),
+            Subtract => "i32.sub".to_string(),
+            Multiply => "i32.mul".to_string(),
+            Divide => "i32.div_s".to_string(),
+        };
+
+        self.push_line(line);
+    }
+
+    fn push_line<T: Display>(&mut self, line: T) {
+        self.res
+            .push_str(&format!("{:indent$}{}\n", "", line, indent = self.indent));
     }
 }
 
 impl Module {
     pub fn as_wat(&self) -> String {
-        let mut res = String::new();
-        res.push_str("(module\n");
-
-        for func in &self.functions {
-            res.push_str(&func.as_wat());
-        }
-        res.push_str(")\n");
-
-        res
-    }
-}
-
-impl Function {
-    pub fn as_wat(&self) -> String {
-        let mut res = String::new();
-        res.push_str("(func $");
-        res.push_str(&self.name);
-        res.push_str(" (result i32)\n");
-        for instr in &self.body {
-            res.push_str(&instr.as_wat());
-        }
-        res.push_str(")\n");
-        if self.exported {
-            res.push_str(format!("(export \"{0}\" (func ${0}))\n", self.name).as_str());
-        }
-
-        res
-    }
-}
-
-impl Instruction {
-    pub fn as_wat(&self) -> String {
-        use Instruction::*;
-        match self {
-            Constant(i) => format!("\ti32.const {}\n", i),
-            Add => "\ti32.add\n".to_string(),
-            Subtract => "\ti32.sub\n".to_string(),
-            Multiply => "\ti32.mul\n".to_string(),
-            Divide => "\ti32.div_s\n".to_string(),
-        }
+        let mut wat = WatFormatter::new();
+        wat.format(self)
     }
 }

@@ -18,8 +18,8 @@ fn _repl() {
         match parse(&line) {
             Ok(expr) => {
                 let wat = compile(expr).as_wat();
-                println!("{}", wat);
-                run(&wat).unwrap();
+                println!("{}", &wat);
+                println!("{:?}", run(&wat));
             }
             Err(err) => println!("{:?}", err),
         }
@@ -28,7 +28,7 @@ fn _repl() {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::{eval_expr, parse};
+    use crate::{compiler::compile, parser::parse, runtime::run};
 
     #[test]
     fn test_eval_expr() {
@@ -44,7 +44,13 @@ mod tests {
 
         for (input, expected) in cases {
             let expr = parse(input).unwrap();
-            assert_eq!(eval_expr(expr), expected);
+            let wat = compile(expr).as_wat();
+            let res = run(&wat).unwrap();
+            assert_eq!(
+                res, expected,
+                "case: {}\nresult: {}\nexpected: {}",
+                input, res, expected
+            );
         }
     }
 }

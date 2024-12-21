@@ -80,18 +80,3 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> Expr {
         })
         .parse(pairs)
 }
-
-pub fn eval_expr(expr: Expr) -> i32 {
-    match expr {
-        Expr::Integer(i) => i,
-        Expr::BinOp { lhs, op, rhs } => match op {
-            BinOp::Add => eval_expr(*lhs) + eval_expr(*rhs),
-            BinOp::Subtract => eval_expr(*lhs) - eval_expr(*rhs),
-            BinOp::Multiply => eval_expr(*lhs) * eval_expr(*rhs),
-            BinOp::Divide => eval_expr(*lhs) / eval_expr(*rhs),
-        },
-        Expr::Prefix { op, rhs } => match op {
-            PrefixOp::Negate => -eval_expr(*rhs),
-        },
-    }
-}
