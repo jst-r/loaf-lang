@@ -4,8 +4,11 @@ integer = @{
     ASCII_DIGIT+
 }
 
+identifier = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
+
 primary = _{
     integer
+  | identifier
   | "(" ~ expr ~ ")"
 }
 
@@ -21,4 +24,10 @@ negate =  { "-" }
 
 expr = { prefix? ~ primary ~ (bin_op ~ prefix? ~ primary)* }
 
-equation = _{ SOI ~ expr ~ EOI }
+expr_stmt =  { expr ~ ";" }
+statement = _{ expr_stmt }
+
+var_declaration =  { "let" ~ identifier ~ "=" ~ expr ~ ";" }
+declaration     = _{ var_declaration | statement }
+
+program = _{ SOI ~ declaration* ~ EOI }

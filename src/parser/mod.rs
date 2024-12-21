@@ -1,4 +1,8 @@
-use pest::{iterators::Pairs, pratt_parser::PrattParser, Parser};
+use pest::{
+    iterators::{Pair, Pairs},
+    pratt_parser::PrattParser,
+    Parser,
+};
 use pest_derive::Parser;
 
 #[derive(Parser)]
@@ -6,7 +10,14 @@ use pest_derive::Parser;
 pub struct LoafParser;
 
 #[derive(Debug)]
+pub enum Statement {
+    Expr(Expr),
+    VarDeclaration { name: String, value: Expr },
+}
+
+#[derive(Debug)]
 pub enum Expr {
+    Identifier(String),
     Integer(i32),
     BinOp {
         lhs: Box<Expr>,
@@ -44,9 +55,27 @@ lazy_static::lazy_static! {
     };
 }
 
-pub fn parse(input: &str) -> Result<Expr, pest::error::Error<Rule>> {
-    let mut pairs = LoafParser::parse(Rule::equation, input)?;
-    Ok(parse_expr(pairs.next().unwrap().into_inner()))
+pub fn parse(input: &str) -> Result<Vec<Statement>, pest::error::Error<Rule>> {
+    let mut stmts = vec![];
+    let pairs = LoafParser::parse(Rule::program, input)?;
+
+    for pair in pairs {
+        match pair.as_rule() {
+            Rule::var_declaration => {
+                let mut inner = pair.into_inner();
+                let name = inner.next().unwrap().as_str().to_string();
+                let value = parse_expr(inner.next().unwrap().into_inner());
+                stmts.push(Statement::VarDeclaration { name, value });
+            }
+            Rule::expr_stmt => {
+                stmts.push(Statement::Expr(parse_expr(pair.into_inner())));
+            }
+            Rule::EOI => {}
+            rule => unreachable!("Expected statement, found rule: {:?}", rule),
+        }
+    }
+
+    Ok(stmts)
 }
 
 pub fn parse_expr(pairs: Pairs<Rule>) -> Expr {
@@ -54,6 +83,7 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> Expr {
         .map_primary(|primary| match primary.as_rule() {
             Rule::integer => Expr::Integer(primary.as_str().parse().unwrap()),
             Rule::expr => parse_expr(primary.into_inner()),
+            Rule::identifier => Expr::Identifier(primary.as_str().to_string()),
             rule => unreachable!("Expected atom, found rule: {:?}", rule),
         })
         .map_prefix(|op, rhs| match op.as_rule() {

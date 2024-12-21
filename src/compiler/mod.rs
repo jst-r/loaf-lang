@@ -1,49 +1,124 @@
 use std::fmt::Display;
 
-use crate::parser::{BinOp, Expr, PrefixOp};
+use crate::parser::{BinOp, Expr, PrefixOp, Statement};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Module {
     functions: Vec<Function>,
 }
 
+#[derive(Debug, Clone)]
+pub struct Function {
+    name: String,
+    exported: bool,
+    locals: Vec<Local>,
+    body: Vec<Instruction>,
+}
+
+#[derive(Debug, Clone)]
 pub struct Local {
     name: String,
     ty: Type,
 }
 
-#[derive(Debug)]
-pub struct Function {
-    name: String,
-    exported: bool,
-    body: Vec<Instruction>,
-}
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Instruction {
     Constant(i32),
     Add,
     Subtract,
     Multiply,
     Divide,
+    Drop,
+    LocalSet(String),
+    LocalGet(String),
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum Type {
     I32,
 }
 
-pub fn compile(expr: Expr) -> Module {
-    let mut body = vec![];
-    compile_expr(expr, &mut body);
-    Module {
-        functions: vec![Function {
-            name: "main".to_string(),
-            exported: true,
-            body,
-        }],
-    }
+pub struct Compiler {
+    module: Module,
+    function: Option<Function>,
 }
 
+impl Compiler {
+    pub fn new() -> Self {
+        Self {
+            module: Module { functions: vec![] },
+            function: None,
+        }
+    }
+
+    pub fn compile(&mut self, prog: Vec<Statement>) -> Module {
+        self.function("main".to_string(), true, prog);
+        self.module.clone()
+    }
+
+    pub fn statement(&mut self, stmt: Statement) {
+        match stmt {
+            Statement::Expr(expr) => self.expr(expr),
+            Statement::VarDeclaration { name, value } => {
+                self.var_declaration(name, value);
+            }
+        }
+    }
+
+    pub fn var_declaration(&mut self, name: String, value: Expr) {
+        self.function.as_mut().unwrap().locals.push(Local {
+            name: name.clone(),
+            ty: Type::I32,
+        });
+
+        self.expr(value);
+        self.push_instruction(Instruction::LocalSet(name));
+    }
+
+    pub fn function(&mut self, name: String, exported: bool, stmts: Vec<Statement>) {
+        self.function = Some(Function {
+            name,
+            exported,
+            locals: vec![],
+            body: vec![],
+        });
+
+        for stmt in stmts {
+            self.statement(stmt);
+        }
+
+        self.module.functions.push(self.function.take().unwrap());
+    }
+
+    pub fn expr(&mut self, expr: Expr) {
+        match expr {
+            Expr::Integer(i) => self.push_instruction(Instruction::Constant(i)),
+            Expr::BinOp { lhs, op, rhs } => {
+                self.expr(*lhs);
+                self.expr(*rhs);
+
+                match op {
+                    BinOp::Add => self.push_instruction(Instruction::Add),
+                    BinOp::Subtract => self.push_instruction(Instruction::Subtract),
+                    BinOp::Multiply => self.push_instruction(Instruction::Multiply),
+                    BinOp::Divide => self.push_instruction(Instruction::Divide),
+                }
+            }
+            Expr::Prefix { op, rhs } => match op {
+                PrefixOp::Negate => {
+                    self.push_instruction(Instruction::Constant(0));
+                    self.expr(*rhs);
+                    self.push_instruction(Instruction::Subtract);
+                }
+            },
+            Expr::Identifier(name) => self.push_instruction(Instruction::LocalGet(name)),
+        }
+    }
+
+    pub fn push_instruction(&mut self, instr: Instruction) {
+        self.function.as_mut().unwrap().body.push(instr);
+    }
+}
 pub fn compile_expr(expr: Expr, res: &mut Vec<Instruction>) {
     match expr {
         Expr::Integer(i) => res.push(Instruction::Constant(i)),
@@ -65,6 +140,7 @@ pub fn compile_expr(expr: Expr, res: &mut Vec<Instruction>) {
                 res.push(Instruction::Subtract);
             }
         },
+        Expr::Identifier(name) => {}
     }
 }
 
@@ -101,6 +177,9 @@ impl WatFormatter {
     fn format_function(&mut self, func: &Function) {
         self.push_line(format!("(func ${} (result i32)", func.name));
         self.indent += 2;
+        for local in &func.locals {
+            self.push_line(format!("(local ${} {})", local.name, local.ty));
+        }
         for instr in &func.body {
             self.format_instruction(instr);
         }
@@ -122,6 +201,9 @@ impl WatFormatter {
             Subtract => "i32.sub".to_string(),
             Multiply => "i32.mul".to_string(),
             Divide => "i32.div_s".to_string(),
+            Drop => "drop".to_string(),
+            LocalSet(name) => format!("local.set ${name}"),
+            LocalGet(name) => format!("local.get ${name}"),
         };
 
         self.push_line(line);
@@ -137,5 +219,13 @@ impl Module {
     pub fn as_wat(&self) -> String {
         let mut wat = WatFormatter::new();
         wat.format(self)
+    }
+}
+
+impl Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Type::I32 => write!(f, "i32"),
+        }
     }
 }
