@@ -1,17 +1,21 @@
-use std::io::BufRead;
-
 mod compiler;
 mod parser;
 mod runtime;
 
 use compiler::Compiler;
-use parser::{parse, LoafParser, Rule};
-use pest::Parser;
+use parser::parse;
 use runtime::run;
+
+const SOURCE: &str = r#"
+let a = 1;
+a += 1;
+a;
+"#;
 
 fn main() {
     let mut comp = Compiler::new();
-    let prog = parse("let a = 1 + 2;a+1;").unwrap();
+    let prog = parse(SOURCE).unwrap();
+    println!("{:?}", prog);
     let wat = comp.compile(prog).as_wat();
     println!("{}", &wat);
     println!("{:?}", run(&wat));

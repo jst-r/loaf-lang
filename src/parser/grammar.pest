@@ -12,12 +12,15 @@ primary = _{
   | "(" ~ expr ~ ")"
 }
 
-bin_op = _{ add | subtract | multiply | divide }
+bin_op = _{ assign | add_assign | subtract_assign | add | subtract | multiply | divide }
 
-add      = { "+" }
-subtract = { "-" }
-multiply = { "*" }
-divide   = { "/" }
+add             = { "+" }
+subtract        = { "-" }
+multiply        = { "*" }
+divide          = { "/" }
+assign          = { "=" }
+add_assign      = { "+=" }
+subtract_assign = { "-=" }
 
 prefix = _{ negate }
 negate =  { "-" }

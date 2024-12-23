@@ -94,15 +94,20 @@ impl Compiler {
         match expr {
             Expr::Integer(i) => self.push_instruction(Instruction::Constant(i)),
             Expr::BinOp { lhs, op, rhs } => {
+                let op_instr = match op {
+                    BinOp::Assign | BinOp::AddAssign | BinOp::SubtractAssign => {
+                        self.assignment(*lhs, op, *rhs);
+                        return;
+                    }
+                    BinOp::Add => Instruction::Add,
+                    BinOp::Subtract => Instruction::Subtract,
+                    BinOp::Multiply => Instruction::Multiply,
+                    BinOp::Divide => Instruction::Divide,
+                };
+
                 self.expr(*lhs);
                 self.expr(*rhs);
-
-                match op {
-                    BinOp::Add => self.push_instruction(Instruction::Add),
-                    BinOp::Subtract => self.push_instruction(Instruction::Subtract),
-                    BinOp::Multiply => self.push_instruction(Instruction::Multiply),
-                    BinOp::Divide => self.push_instruction(Instruction::Divide),
-                }
+                self.push_instruction(op_instr);
             }
             Expr::Prefix { op, rhs } => match op {
                 PrefixOp::Negate => {
@@ -115,32 +120,35 @@ impl Compiler {
         }
     }
 
+    fn assignment(&mut self, target: Expr, op: BinOp, val: Expr) {
+        if let Expr::Identifier(name) = target {
+            match op {
+                BinOp::Assign => {
+                    dbg!(&val);
+                    self.expr(val);
+                    self.push_instruction(Instruction::LocalSet(name));
+                }
+                BinOp::AddAssign => {
+                    self.push_instruction(Instruction::LocalGet(name.clone()));
+                    self.expr(val);
+                    self.push_instruction(Instruction::Add);
+                    self.push_instruction(Instruction::LocalSet(name));
+                }
+                BinOp::SubtractAssign => {
+                    self.push_instruction(Instruction::LocalGet(name.clone()));
+                    self.expr(val);
+                    self.push_instruction(Instruction::Subtract);
+                    self.push_instruction(Instruction::LocalSet(name));
+                }
+                _ => panic!("Unexpected assignment operator: {:?}", op),
+            }
+        } else {
+            panic!("Expected identifier, found: {:?}", target);
+        }
+    }
+
     pub fn push_instruction(&mut self, instr: Instruction) {
         self.function.as_mut().unwrap().body.push(instr);
-    }
-}
-pub fn compile_expr(expr: Expr, res: &mut Vec<Instruction>) {
-    match expr {
-        Expr::Integer(i) => res.push(Instruction::Constant(i)),
-        Expr::BinOp { lhs, op, rhs } => {
-            compile_expr(*lhs, res);
-            compile_expr(*rhs, res);
-
-            match op {
-                BinOp::Add => res.push(Instruction::Add),
-                BinOp::Subtract => res.push(Instruction::Subtract),
-                BinOp::Multiply => res.push(Instruction::Multiply),
-                BinOp::Divide => res.push(Instruction::Divide),
-            }
-        }
-        Expr::Prefix { op, rhs } => match op {
-            PrefixOp::Negate => {
-                res.push(Instruction::Constant(0));
-                compile_expr(*rhs, res);
-                res.push(Instruction::Subtract);
-            }
-        },
-        Expr::Identifier(name) => {}
     }
 }
 
@@ -175,7 +183,13 @@ impl WatFormatter {
     }
 
     fn format_function(&mut self, func: &Function) {
-        self.push_line(format!("(func ${} (result i32)", func.name));
+        let name = if func.exported {
+            format!("(export \"{}\")", func.name)
+        } else {
+            format!("${}", func.name)
+        };
+
+        self.push_line(format!("(func {name} (result i32)"));
         self.indent += 2;
         for local in &func.locals {
             self.push_line(format!("(local ${} {})", local.name, local.ty));
@@ -186,10 +200,6 @@ impl WatFormatter {
 
         self.indent -= 2;
         self.push_line(")");
-
-        if func.exported {
-            self.push_line(format!("(export \"{}\" (func ${}))", func.name, func.name));
-        }
     }
 
     fn format_instruction(&mut self, instr: &Instruction) {

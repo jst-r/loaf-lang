@@ -36,6 +36,9 @@ pub enum BinOp {
     Subtract,
     Multiply,
     Divide,
+    Assign,
+    AddAssign,
+    SubtractAssign,
 }
 
 #[derive(Debug)]
@@ -49,6 +52,7 @@ lazy_static::lazy_static! {
         use Rule::*;
 
         PrattParser::new()
+        .op(Op::infix(assign, Right) | Op::infix(add_assign, Right) | Op::infix(subtract_assign, Right))
             .op(Op::infix(add, Left) | Op::infix(subtract, Left))
             .op(Op::infix(multiply, Left) | Op::infix(divide, Left))
             .op(Op::prefix(negate))
@@ -99,6 +103,9 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> Expr {
                 Rule::subtract => BinOp::Subtract,
                 Rule::multiply => BinOp::Multiply,
                 Rule::divide => BinOp::Divide,
+                Rule::assign => BinOp::Assign,
+                Rule::add_assign => BinOp::AddAssign,
+                Rule::subtract_assign => BinOp::SubtractAssign,
                 rule => unreachable!("Expected bin_op, found rule: {:?}", rule),
             };
 
