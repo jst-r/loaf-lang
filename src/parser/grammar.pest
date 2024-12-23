@@ -27,8 +27,9 @@ negate =  { "-" }
 
 expr = { prefix? ~ primary ~ (bin_op ~ prefix? ~ primary)* }
 
-expr_stmt =  { expr ~ ";" }
-statement = _{ expr_stmt }
+expr_stmt   =  { expr ~ ";" }
+return_stmt =  { "return" ~ expr ~ ";" }
+statement   = _{ expr_stmt | return_stmt }
 
 var_declaration =  { "let" ~ identifier ~ "=" ~ expr ~ ";" }
 declaration     = _{ var_declaration | statement }

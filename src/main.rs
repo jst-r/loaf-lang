@@ -9,7 +9,7 @@ use runtime::run;
 const SOURCE: &str = r#"
 let a = 1;
 a += 1;
-a;
+return a;
 "#;
 
 fn main() {

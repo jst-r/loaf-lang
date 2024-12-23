@@ -13,6 +13,7 @@ pub struct LoafParser;
 pub enum Statement {
     Expr(Expr),
     VarDeclaration { name: String, value: Expr },
+    Return { value: Expr },
 }
 
 #[derive(Debug)]
@@ -74,6 +75,13 @@ pub fn parse(input: &str) -> Result<Vec<Statement>, pest::error::Error<Rule>> {
             Rule::expr_stmt => {
                 stmts.push(Statement::Expr(parse_expr(pair.into_inner())));
             }
+
+            Rule::return_stmt => {
+                let mut inner = pair.into_inner();
+                let value = parse_expr(inner.next().unwrap().into_inner());
+                stmts.push(Statement::Return { value });
+            }
+
             Rule::EOI => {}
             rule => unreachable!("Expected statement, found rule: {:?}", rule),
         }

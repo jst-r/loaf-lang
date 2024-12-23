@@ -29,6 +29,7 @@ pub enum Instruction {
     Multiply,
     Divide,
     Drop,
+    Return,
     LocalSet(String),
     LocalGet(String),
 }
@@ -58,9 +59,16 @@ impl Compiler {
 
     pub fn statement(&mut self, stmt: Statement) {
         match stmt {
-            Statement::Expr(expr) => self.expr(expr),
+            Statement::Expr(expr) => {
+                self.expr(expr);
+                self.push_instruction(Instruction::Drop);
+            }
             Statement::VarDeclaration { name, value } => {
                 self.var_declaration(name, value);
+            }
+            Statement::Return { value } => {
+                self.expr(value);
+                self.push_instruction(Instruction::Return);
             }
         }
     }
@@ -124,24 +132,24 @@ impl Compiler {
         if let Expr::Identifier(name) = target {
             match op {
                 BinOp::Assign => {
-                    dbg!(&val);
                     self.expr(val);
-                    self.push_instruction(Instruction::LocalSet(name));
+                    self.push_instruction(Instruction::LocalSet(name.clone()));
                 }
                 BinOp::AddAssign => {
                     self.push_instruction(Instruction::LocalGet(name.clone()));
                     self.expr(val);
                     self.push_instruction(Instruction::Add);
-                    self.push_instruction(Instruction::LocalSet(name));
+                    self.push_instruction(Instruction::LocalSet(name.clone()));
                 }
                 BinOp::SubtractAssign => {
                     self.push_instruction(Instruction::LocalGet(name.clone()));
                     self.expr(val);
                     self.push_instruction(Instruction::Subtract);
-                    self.push_instruction(Instruction::LocalSet(name));
+                    self.push_instruction(Instruction::LocalSet(name.clone()));
                 }
                 _ => panic!("Unexpected assignment operator: {:?}", op),
             }
+            self.push_instruction(Instruction::LocalGet(name)); // needed for associativity
         } else {
             panic!("Expected identifier, found: {:?}", target);
         }
@@ -214,6 +222,7 @@ impl WatFormatter {
             Drop => "drop".to_string(),
             LocalSet(name) => format!("local.set ${name}"),
             LocalGet(name) => format!("local.get ${name}"),
+            Return => "return".to_string(),
         };
 
         self.push_line(line);
