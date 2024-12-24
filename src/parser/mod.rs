@@ -1,8 +1,4 @@
-use pest::{
-    iterators::{Pair, Pairs},
-    pratt_parser::PrattParser,
-    Parser,
-};
+use pest::{iterators::Pairs, pratt_parser::PrattParser, Parser};
 use pest_derive::Parser;
 
 #[derive(Parser)]
