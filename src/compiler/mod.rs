@@ -1,43 +1,10 @@
+mod wasm;
+
 use std::fmt::Display;
 
+use wasm::{Function, Instruction, Local, Module, Type};
+
 use crate::parser::{BinOp, Expr, PrefixOp, Statement};
-
-#[derive(Debug, Clone)]
-pub struct Module {
-    functions: Vec<Function>,
-}
-
-#[derive(Debug, Clone)]
-pub struct Function {
-    name: String,
-    exported: bool,
-    locals: Vec<Local>,
-    body: Vec<Instruction>,
-}
-
-#[derive(Debug, Clone)]
-pub struct Local {
-    name: String,
-    ty: Type,
-}
-
-#[derive(Debug, Clone)]
-pub enum Instruction {
-    Constant(i32),
-    Add,
-    Subtract,
-    Multiply,
-    Divide,
-    Drop,
-    Return,
-    LocalSet(String),
-    LocalGet(String),
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum Type {
-    I32,
-}
 
 pub struct Compiler {
     module: Module,
@@ -238,13 +205,5 @@ impl Module {
     pub fn as_wat(&self) -> String {
         let mut wat = WatFormatter::new();
         wat.format(self)
-    }
-}
-
-impl Display for Type {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Type::I32 => write!(f, "i32"),
-        }
     }
 }
