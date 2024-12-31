@@ -9,8 +9,12 @@ identifier = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
 primary = _{
     integer
   | identifier
-  | "(" ~ expr ~ ")"
+  | group_expression
+  | block_expression
 }
+
+group_expression = _{ "(" ~ expr ~ ")" }
+block_expression =  { "{" ~ declaration* ~ "}" }
 
 bin_op = _{ assign | add_assign | subtract_assign | add | subtract | multiply | divide }
 
@@ -25,7 +29,9 @@ subtract_assign = { "-=" }
 prefix = _{ negate }
 negate =  { "-" }
 
-expr = { prefix? ~ primary ~ (bin_op ~ prefix? ~ primary)* }
+op_expression = _{ prefix? ~ primary ~ (bin_op ~ prefix? ~ primary)* }
+
+expr = { op_expression }
 
 expr_stmt   =  { expr ~ ";" }
 return_stmt =  { "return" ~ expr ~ ";" }

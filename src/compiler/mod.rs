@@ -1,21 +1,35 @@
 mod wasm;
 
-use std::fmt::Display;
+use std::{fmt::Display, vec};
 
-use wasm::{Function, Instruction, Local, Module, Type};
+use wasm::{Function, Instruction, Module, Type};
 
 use crate::parser::{BinOp, Expr, PrefixOp, Statement};
 
 pub struct Compiler {
-    module: Module,
-    function: Option<Function>,
+    pub module: Module,
+    pub function: Option<Function>,
+    pub locals: Vec<Local>,
+    pub scope_depth: usize,
+    pub next_local_id: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct Local {
+    pub id: usize,
+    pub name: String,
+    pub ty: Type,
+    pub depth: usize,
 }
 
 impl Compiler {
     pub fn new() -> Self {
         Self {
             module: Module { functions: vec![] },
+            locals: vec![],
+            scope_depth: 0,
             function: None,
+            next_local_id: 0,
         }
     }
 
@@ -41,21 +55,42 @@ impl Compiler {
     }
 
     pub fn var_declaration(&mut self, name: String, value: Expr) {
-        self.function.as_mut().unwrap().locals.push(Local {
+        self.expr(value); // compile the value first to prevent use before declaration
+
+        let local = Local {
+            id: self.next_local_id,
             name: name.clone(),
             ty: Type::I32,
-        });
+            depth: self.scope_depth,
+        };
+        self.next_local_id += 1;
 
-        self.expr(value);
-        self.push_instruction(Instruction::LocalSet(name));
+        self.locals.push(local.clone());
+
+        self.function
+            .as_mut()
+            .unwrap()
+            .locals
+            .push(local.as_wasm_local());
+
+        self.push_instruction(Instruction::LocalSet(local.wasm_local_name()));
+    }
+
+    pub fn resolve_local(&mut self, name: String) -> String {
+        for local in self.locals.iter().rev() {
+            if local.name == name {
+                return local.wasm_local_name();
+            }
+        }
+        panic!("Local not found: {}", name);
     }
 
     pub fn function(&mut self, name: String, exported: bool, stmts: Vec<Statement>) {
         self.function = Some(Function {
             name,
             exported,
-            locals: vec![],
             body: vec![],
+            locals: vec![],
         });
 
         for stmt in stmts {
@@ -91,12 +126,23 @@ impl Compiler {
                     self.push_instruction(Instruction::Subtract);
                 }
             },
-            Expr::Identifier(name) => self.push_instruction(Instruction::LocalGet(name)),
+            Expr::Identifier(name) => {
+                let wasm_name = self.resolve_local(name.clone());
+                self.push_instruction(Instruction::LocalGet(wasm_name));
+            }
+            Expr::Block(stmts) => {
+                self.begin_scope();
+                for stmt in stmts {
+                    self.statement(stmt);
+                }
+                self.end_scope();
+            }
         }
     }
 
     fn assignment(&mut self, target: Expr, op: BinOp, val: Expr) {
         if let Expr::Identifier(name) = target {
+            let name = self.resolve_local(name.clone());
             match op {
                 BinOp::Assign => {
                     self.expr(val);
@@ -124,6 +170,14 @@ impl Compiler {
 
     pub fn push_instruction(&mut self, instr: Instruction) {
         self.function.as_mut().unwrap().body.push(instr);
+    }
+
+    pub fn begin_scope(&mut self) {
+        self.scope_depth += 1;
+    }
+
+    pub fn end_scope(&mut self) {
+        self.scope_depth -= 1;
     }
 }
 
@@ -205,5 +259,18 @@ impl Module {
     pub fn as_wat(&self) -> String {
         let mut wat = WatFormatter::new();
         wat.format(self)
+    }
+}
+
+impl Local {
+    pub fn as_wasm_local(&self) -> wasm::Local {
+        wasm::Local {
+            name: self.wasm_local_name(),
+            ty: self.ty.clone(),
+        }
+    }
+
+    pub fn wasm_local_name(&self) -> String {
+        format!("{}_{}", self.name, self.id)
     }
 }

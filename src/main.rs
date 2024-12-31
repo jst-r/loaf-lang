@@ -7,9 +7,11 @@ use parser::parse;
 use runtime::run;
 
 const SOURCE: &str = r#"
+{
 let a = 1;
 a += 1;
 return a;
+};
 "#;
 
 fn main() {

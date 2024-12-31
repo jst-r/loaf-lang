@@ -25,6 +25,7 @@ pub enum Expr {
         op: PrefixOp,
         rhs: Box<Expr>,
     },
+    Block(Vec<Statement>),
 }
 
 #[derive(Debug)]
@@ -57,8 +58,13 @@ lazy_static::lazy_static! {
 }
 
 pub fn parse(input: &str) -> Result<Vec<Statement>, pest::error::Error<Rule>> {
-    let mut stmts = vec![];
     let pairs = LoafParser::parse(Rule::program, input)?;
+
+    Ok(parse_statements(pairs))
+}
+
+pub fn parse_statements(pairs: Pairs<Rule>) -> Vec<Statement> {
+    let mut stmts = vec![];
 
     for pair in pairs {
         match pair.as_rule() {
@@ -82,8 +88,7 @@ pub fn parse(input: &str) -> Result<Vec<Statement>, pest::error::Error<Rule>> {
             rule => unreachable!("Expected statement, found rule: {:?}", rule),
         }
     }
-
-    Ok(stmts)
+    stmts
 }
 
 pub fn parse_expr(pairs: Pairs<Rule>) -> Expr {
@@ -92,6 +97,7 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> Expr {
             Rule::integer => Expr::Integer(primary.as_str().parse().unwrap()),
             Rule::expr => parse_expr(primary.into_inner()),
             Rule::identifier => Expr::Identifier(primary.as_str().to_string()),
+            Rule::block_expression => Expr::Block(parse_statements(primary.into_inner())),
             rule => unreachable!("Expected atom, found rule: {:?}", rule),
         })
         .map_prefix(|op, rhs| match op.as_rule() {
