@@ -10,8 +10,8 @@ const SOURCE: &str = r#"
 {
 let a = 1;
 a += 1;
-return a;
 };
+return a;
 "#;
 
 fn main() {

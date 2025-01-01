@@ -136,6 +136,7 @@ impl Compiler {
                     self.statement(stmt);
                 }
                 self.end_scope();
+                self.push_instruction(Instruction::Constant(0)); // TODO: fix this hack, requires block return value handling
             }
         }
     }
@@ -178,6 +179,7 @@ impl Compiler {
 
     pub fn end_scope(&mut self) {
         self.scope_depth -= 1;
+        self.locals.retain(|local| local.depth <= self.scope_depth);
     }
 }
 
