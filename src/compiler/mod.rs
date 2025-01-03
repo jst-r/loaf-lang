@@ -1,25 +1,37 @@
 mod wasm;
 
-use std::{fmt::Display, vec};
+use std::{f32::consts::E, fmt::Display, vec};
 
-use wasm::{Function, Instruction, Module, Type};
+use wasm::{Function, Instruction, Module};
 
 use crate::parser::{BinOp, Expr, PrefixOp, Statement};
 
 pub struct Compiler {
     pub module: Module,
     pub function: Option<Function>,
-    pub locals: Vec<Local>,
+    pub locals: Vec<ValueBinding>,
     pub scope_depth: usize,
     pub next_local_id: usize,
 }
 
 #[derive(Debug, Clone)]
-pub struct Local {
+pub struct ValueBinding {
     pub id: usize,
     pub name: String,
     pub ty: Type,
     pub depth: usize,
+}
+
+#[derive(Debug, Clone)]
+pub enum Type {
+    Primitive(PrimitiveType),
+}
+
+#[derive(Debug, Clone)]
+pub enum PrimitiveType {
+    I32,
+    F32,
+    Bool,
 }
 
 impl Compiler {
@@ -57,10 +69,10 @@ impl Compiler {
     pub fn var_declaration(&mut self, name: String, value: Expr) {
         self.expr(value); // compile the value first to prevent use before declaration
 
-        let local = Local {
+        let local = ValueBinding {
             id: self.next_local_id,
             name: name.clone(),
-            ty: Type::I32,
+            ty: Type::Primitive(PrimitiveType::I32),
             depth: self.scope_depth,
         };
         self.next_local_id += 1;
@@ -264,15 +276,27 @@ impl Module {
     }
 }
 
-impl Local {
+impl ValueBinding {
     pub fn as_wasm_local(&self) -> wasm::Local {
         wasm::Local {
             name: self.wasm_local_name(),
-            ty: self.ty.clone(),
+            ty: self.ty.as_wasm_type(),
         }
     }
 
     pub fn wasm_local_name(&self) -> String {
         format!("{}_{}", self.name, self.id)
+    }
+}
+
+impl Type {
+    pub fn as_wasm_type(&self) -> wasm::WasmType {
+        match self {
+            Type::Primitive(prim) => match prim {
+                PrimitiveType::I32 => wasm::WasmType::I32,
+                PrimitiveType::F32 => wasm::WasmType::F32,
+                PrimitiveType::Bool => wasm::WasmType::I32,
+            },
+        }
     }
 }

@@ -16,7 +16,7 @@ pub struct Function {
 #[derive(Debug, Clone)]
 pub struct Local {
     pub name: String,
-    pub ty: Type,
+    pub ty: WasmType,
 }
 
 #[derive(Debug, Clone)]
@@ -33,14 +33,16 @@ pub enum Instruction {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum Type {
+pub enum WasmType {
     I32,
+    F32,
 }
 
-impl Display for Type {
+impl Display for WasmType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Type::I32 => write!(f, "i32"),
+            WasmType::I32 => write!(f, "i32"),
+            WasmType::F32 => write!(f, "f32"),
         }
     }
 }
